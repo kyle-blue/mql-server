@@ -1,7 +1,5 @@
 #property strict
 
-// #include <Zmq/Zmq.mqh>
-
 #include "Include/Zmq/Zmq.mqh"
 
 struct SymbolInfo {
@@ -21,11 +19,15 @@ SymbolInfo getNext() {
     return info;
 }
 
+Context context;
+Socket socket(context, ZMQ_REP);
 int OnInit() {
     //--- create timer
+    socket.bind("tcp://*:5555");
     EventSetMillisecondTimer(1);
 
     return (INIT_SUCCEEDED);
+    
 }
 
 // void OnDeinit(const int reason)
@@ -37,9 +39,20 @@ int OnInit() {
 void OnTick() {
 }
 
+
 void OnTimer() {
-    SymbolInfo info = getNext();
-    Print("Current bid  for ", info.name, " is ", info.bid, " and current ask is ", info.ask);
+    //SymbolInfo info = getNext();
+    //Print("Current bid  for ", info.name, " is ", info.bid, " and current ask is ", info.ask);
+    
+      ZmqMsg req;
+      socket.recv(req);
+      
+      Print("Received request ", req.getData());
+      
+      ZmqMsg res("What's up gamers?!");
+      Print("Sending response: ", res.getData());
+     
+      socket.send(res);
 }
 
 // double OnTester()
