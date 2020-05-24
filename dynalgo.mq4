@@ -1,68 +1,69 @@
-#property strict
+// #property strict
 
 #include "Include/Zmq/Zmq.mqh"
 
-struct SymbolInfo {
-    string name;
-    double bid;
-    double ask;
-};
+template <typename T>
+T *append(T &array[], T &item) {
+    int size = ArraySize(array);
+    ArrayResize(array, size + 1);
+    array[size] = item;
+    return &array[size];
+}
+template <typename T>
+T append(T &array[], T item) {
+    int size = ArraySize(array);
+    ArrayResize(array, size + 1);
+    array[size] = item;
+    return array[size];
+}
 
-SymbolInfo getNext() {
-    static int index = -1;
-    index = (index + 1) % SymbolsTotal(true);
-
-    SymbolInfo info = SymbolInfo();
-    info.name = SymbolName(index, true);
-    info.bid = MarketInfo(info.name, MODE_BID);
-    info.ask = MarketInfo(info.name, MODE_ASK);
-    return info;
+template <typename T>
+T find_max(T &array[]) {
+    T max = T();
+    for (int i = 0; i < ArraySize(array); i++) {
+        if (array[i] > max) {
+            max = array[i];
+        }
+    }
+    return max;
 }
 
 Context context;
-Socket socket(context, ZMQ_REP);
+Socket main_socket(context, ZMQ_REP);
+Socket sockets[];
+int ports[] = {5555};
+ZmqMsg req("");
 int OnInit() {
     //--- create timer
-    socket.bind("tcp://*:5555");
+    main_socket.bind("tcp://*:" + (string)ports[0]);
     EventSetMillisecondTimer(1);
-
     return (INIT_SUCCEEDED);
-    
 }
 
-// void OnDeinit(const int reason)
-// {
-//   //--- destroy timer
-//   // EventKillTimer();
-// }
+void OnDeinit(const int reason) {}
 
 void OnTick() {
+    ZmqMsg info("poop");
+    for (int i = 0; i < ArraySize(sockets); i++) {
+        Socket *s = &sockets[i];
+        s.send(info);
+    }
 }
-
 
 void OnTimer() {
-    //SymbolInfo info = getNext();
-    //Print("Current bid  for ", info.name, " is ", info.bid, " and current ask is ", info.ask);
-    
-      ZmqMsg req;
-      socket.recv(req);
-      
-      Print("Received request ", req.getData());
-      
-      ZmqMsg res("What's up gamers?!");
-      Print("Sending response: ", res.getData());
-     
-      socket.send(res);
+    bool success = main_socket.recv(req, ZMQ_DONTWAIT);
+    if (success) {
+        Print("Received request '", req.getData(), "'");
+        if (req.getData() == "Requesting Connection") {
+            int new_port = append(ports, find_max(ports) + 1);
+            ZmqMsg res("Connection Accepted\nPort: " + (string)new_port);
+            Socket *p_socket = append(sockets, Socket(context, ZMQ_REP));
+            p_socket.bind("tcp://*:" + (string)new_port);
+            Print("Connection Accepted on Port " + (string)new_port);
+            main_socket.send(res);
+        } else if (StringFind(req.getData(), "Remove Connection") != -1) {
+            Print("Removing Connection...");
+            // TODO: Remove Connection
+        }
+    }
 }
-
-// double OnTester()
-// {
-//   return 1.0;
-// }
-
-// void OnChartEvent(const int id,
-//                   const long &lparam,
-//                   const double &dparam,
-//                   const string &sparam)
-// {
-// }
