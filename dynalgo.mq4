@@ -84,6 +84,7 @@ void closeTrade(CJAVal& tradeInfo, Socket& socket) {
 
     Print(slippage);
     bool ret = OrderClose(ticket, lots, price, slippage, arrowColor);
+    if (!ret) ret = OrderDelete(ticket, arrowColor);
 
     CJAVal tradeRes;
     if (!ret) {
@@ -115,6 +116,28 @@ void modifyTrade(CJAVal& tradeInfo, Socket& socket) {
     } else {
     }
     socket.send(retString);
+}
+
+void getStaticInfo(Socket& socket) {
+    CJAVal json;
+    json["type"] = "MARKET_INFO";
+    for (int i = 0; i < SymbolsTotal(true); i++) {
+        string name = SymbolName(i, true);
+        double minLot = MarketInfo(name, MODE_MINLOT);
+        double tickSize = MarketInfo(name, MODE_TICKSIZE);
+
+        CJAVal s;  // Symbol info
+        s["name"] = name;
+        s["tickSize"] = tickSize;
+        s["minLot"] = minLot;
+
+        json["symbols"].Add(s);
+    }
+    CJAVal a;               // account info
+    a["commission"] = 6.0;  // 6 dollars for blackbullmarkets
+    a["leverage"] = AccountInfoInteger(ACCOUNT_LEVERAGE);
+    json["account"].CopyData(a);
+    socket.send(json.Serialize());
 }
 
 void handleSocketConnections() {
@@ -158,6 +181,8 @@ void handleSocketConnections() {
                 closeTrade(req["data"], sockets[i]);
             else if (req["type"].ToStr() == "MODIFY TRADE")
                 modifyTrade(req["data"], sockets[i]);
+            else if (req["type"].ToStr() == "GET STATIC INFO")
+                getStaticInfo(sockets[i]);
         }
     }
 }
